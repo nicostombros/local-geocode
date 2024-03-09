@@ -3,7 +3,6 @@ import os
 import pickle
 import logging
 from tqdm import tqdm
-import sys
 from flashtext import KeywordProcessor
 import joblib
 import multiprocessing
@@ -12,7 +11,6 @@ import urllib.request
 import zipfile
 import numpy as np
 import hashlib
-import json
 from .flags import flags
 
 
