@@ -20,13 +20,24 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-5.5s] 
 log = logging.getLogger(__name__)
 
 class Geocode():
-    def __init__(self, min_population_cutoff=30000, large_city_population_cutoff=200000, location_types=None, country_code_in=[]):
+    def __init__(
+        self,
+        min_population_cutoff=10000,
+        large_city_population_cutoff=200000,
+        location_types=None,
+        country_code_in=[],
+        include_duplicates=False,
+        kw_format=["name", "country_code"],
+    ):
         self.kp = None
         self.geo_data = None
         self.min_population_cutoff = min_population_cutoff
         self.large_city_population_cutoff = large_city_population_cutoff
         self.country_code_in = country_code_in
+        self.include_duplicates = include_duplicates
+        self.kw_format = kw_format
         self.geo_data_field_names = ['name', 'official_name', 'country_code', 'longitude', 'latitude', 'geoname_id', 'location_type', 'population']
+        self.kw_format_to_geo_data_field_indexes = [index for index, field in enumerate(self.geo_data_field_names) if field in kw_format]
         self.default_location_types = ['city', 'place', 'country', 'admin1', 'admin2', 'admin3', 'admin4', 'admin5', 'admin6', 'admin_other', 'continent', 'region']
         self.location_types = self._get_location_types(location_types)
         self.argument_hash = self.get_arguments_hash()
@@ -245,8 +256,9 @@ class Geocode():
         log.info('Sorting by priority...')
         df.sort_values(by=['priority', 'population'], ascending=[True, False], inplace=True)
         # drop name duplicates by keeping only the high priority elements
-        df['name_lower'] = df['name'].str.lower()
-        df = df.drop_duplicates('name_lower', keep='first')
+        if not self.include_duplicates:
+            df['name_lower'] = df['name'].str.lower()
+            df = df.drop_duplicates('name_lower', keep='first')
         # set location_types
         df['location_type'] = np.nan
         for admin_level in range(1, 6):
@@ -278,7 +290,10 @@ class Geocode():
         log.info('Adding terms to keyword processor (building trie)...')
         for i, item in tqdm(enumerate(geo_data), total=len(geo_data)):
             idx = str(i)
-            kp.add_keyword(item[0], idx)
+            if self.kw_format:
+                kp.add_keyword(", ".join(item[i] for i in self.kw_format_to_geo_data_field_indexes), idx)
+            else:
+                kp.add_keyword(item[0], idx)
         log.info(f'Writing keyword processor pickle to file {self.keyword_processor_pickle_path}...')
         with open(self.keyword_processor_pickle_path, 'wb') as f:
             pickle.dump(kp, f)
